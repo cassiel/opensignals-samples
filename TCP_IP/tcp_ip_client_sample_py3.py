@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+# pip install pandas python-osc
+
 import socket
 import json
 import ast
@@ -8,11 +10,18 @@ import select
 import queue
 import pandas as pd
 import numpy as np
+from pythonosc.udp_client import SimpleUDPClient
 
+TCP_SERVER_IP = '127.0.0.1'
+TCP_SERVER_PORT = 5555
+OSC_OUT_IP = '127.0.0.1'
+OSC_OUT_PORT = 8888
+
+osc_client = SimpleUDPClient(OSC_OUT_IP, OSC_OUT_PORT)
 
 def show_menu():
-    for id in MENU_IMPUT.keys():
-        print(str(id) + ' | ' + MENU_IMPUT[id])
+    for id in MENU_INPUT.keys():
+        print(str(id) + ' | ' + MENU_INPUT[id])
 
 def action_decode(action):
     if action == '0':
@@ -47,8 +56,8 @@ def action_decode(action):
 
 class TCPClient(object):
     def __init__(self):
-        self.tcpIp = '127.0.0.1'
-        self.tcpPort = 5555
+        self.tcpIp = TCP_SERVER_IP
+        self.tcpPort = TCP_SERVER_PORT
         self.buffer_size = 99999
 
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -80,10 +89,12 @@ class TCPClient(object):
             for s in readable:
                 message = s.recv(self.buffer_size)
                 if not self.isAcquiring:
-                    print(message)
+                    print("+", end="", flush=True)
+                    ###print(message)
                     self.inputCheck = []
                 else:
-                    print(message)
+                    print("-", end="", flush=True)
+                    ###print(message)
                     message = json.loads(message)
                     message = message["returnData"]
                     if not self.txtFile.getHasHeader():
@@ -100,6 +111,9 @@ class TCPClient(object):
                         for line in dataframe.values:
                             self.txtFile.addData('\n')
                             self.txtFile.addData(",".join([str(x) for x in line]))
+
+                        for line in dataframe.values:
+                            osc_client.send_message("/plux", line)
 
             for s in writable:
                 try:
@@ -151,7 +165,7 @@ class SaveAcquisition(object):
 
 
 if __name__ == "__main__":
-    MENU_IMPUT = {0: 'devices',
+    MENU_INPUT = {0: 'devices',
                   1: 'config,{MAC|DEVICE_ID}',
                   2: 'config,{MAC|DEVICE_ID}, {PARAM}, {VALUE}',
                   3: 'enable,{MAC|DEVICE_ID}',
